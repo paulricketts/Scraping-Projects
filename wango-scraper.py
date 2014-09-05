@@ -52,13 +52,13 @@ def get_pagecount(soup):
     for emtag in top_tags:
         raw_hits_info.extend(emtag.find_all('b'))
     print raw_hits_info
-    print """"int(math.ceil(int("""+str(raw_hits_info[0])+""".string)/int("""+str(raw_hits_info[1])+""".string[4::])))"""
-    print """int(math.ceil("""+str(float(raw_hits_info[0].string))+"""/"""+str(float(raw_hits_info[1].string[4::]))+"""))"""
-    print """int(math.ceil("""+str(float(raw_hits_info[0].string)/float(raw_hits_info[1].string[4::]))+"""))"""
-    print """int("""+str(math.ceil(float(raw_hits_info[0].string)/float(raw_hits_info[1].string[4::])))+""")"""
-    if float(raw_hits_info[1].string[4::]) == 0.0:
+    if raw_hits_info[1].string == '1 - 0':
         pages = 1
     else:
+        print """"int(math.ceil(int("""+str(raw_hits_info[0])+""".string)/int("""+str(raw_hits_info[1])+""".string[4::])))"""
+        print """int(math.ceil("""+str(float(raw_hits_info[0].string))+"""/"""+str(float(raw_hits_info[1].string[4::]))+"""))"""
+        print """int(math.ceil("""+str(float(raw_hits_info[0].string)/float(raw_hits_info[1].string[4::]))+"""))"""
+        print """int("""+str(math.ceil(float(raw_hits_info[0].string)/float(raw_hits_info[1].string[4::])))+""")"""
         pages = int(math.ceil(float(raw_hits_info[0].string)/float(raw_hits_info[1].string[4::])))
     print pages
 
