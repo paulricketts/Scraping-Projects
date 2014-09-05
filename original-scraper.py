@@ -1,3 +1,5 @@
+from datetime import datetime
+overallStartTime = datetime.now()
 import requests
 from bs4 import BeautifulSoup
 import sys
@@ -7,6 +9,7 @@ import json
 def fetch_results(
     query=None, minAsk=None, maxAsk=None, bedrooms=None
 ):
+    startTime = datetime.now()
 
     search_params = {
         key: val for key, val in locals().items() if val is not None
@@ -17,6 +20,7 @@ def fetch_results(
     base = 'http://seattle.craigslist.org/search/apa'
     resp = requests.get(base, params=search_params, timeout=3)
     resp.raise_for_status()  # no op if status == 200
+    print('fetch_results run time: '+str(datetime.now()-startTime))
     return resp.content, resp.encoding
 
 # html_base = fetch_results("South Lake Union", 1500, 2500)
@@ -25,23 +29,30 @@ def fetch_results(
 
 
 def fetch_json_results(**kwargs):
+    startTime = datetime.now()
     base = 'http://seattle.craigslist.org/jsonsearch/apa'
     resp = requests.get(base, params=kwargs)
     resp.raise_for_status()
+    print('fetch_json_results run time: '+str(datetime.now()-startTime))
     return resp.json()
 
 
 def read_search_results(file='apartments.html'):
+    startTime = datetime.now()
     with open(file, 'rb') as read_file:
         return read_file.read(), 'utf-8'
+    print('read_search_results run time: '+str(datetime.now()-startTime))
 
 
 def parse_source(html, encoding='utf-8'):
+    startTime = datetime.now()
     parsed = BeautifulSoup(html, from_encoding=encoding)
     return parsed
+    print('parse_source run time: '+str(datetime.now()-startTime))
 
 
 def extract_listings(parsed):
+    startTime = datetime.now()
     listings = parsed.find_all('p', class_='row')
     for listing in listings:
         link = listing.find('span', class_='pl').find('a')
@@ -54,9 +65,11 @@ def extract_listings(parsed):
             'size': price_span.next_sibling.strip(' \n-/')
         }
         yield this_listing
+    print('extract_listings run time: '+str(datetime.now()-startTime))
 
 
 def add_location(listing, search):
+    startTime = datetime.now()
     """True if listing can be located, otherwise False"""
     if listing['pid'] in search:
         match = search[listing['pid']]
@@ -66,9 +79,11 @@ def add_location(listing, search):
         }
         return True
     return False
+    print('add_location run time: '+str(datetime.now()-startTime))
 
 
 def add_address(listing):
+    startTime = datetime.now()
     api_url = 'http://maps.googleapis.com/maps/api/geocode/json'
     loc = listing['location']
     lactlng_tmpl = "{data-latitude},{data-longitude}"
@@ -84,6 +99,7 @@ def add_address(listing):
         listing['address'] = best['formatted_address']
     else:
         listing['address'] = 'unavailable'
+    print('add_address run time: '+str(datetime.now()-startTime))
     return listing
 
 
@@ -102,3 +118,5 @@ if __name__ == '__main__':
         if (add_location(listing, search)):
             listing = add_address(listing)
             pprint.pprint(listing)
+
+print('Overall run time: '+str(datetime.now()-overallStartTime))

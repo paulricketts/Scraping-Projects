@@ -1,3 +1,5 @@
+from datetime import datetime
+overallStartTime = datetime.now()
 # Import requests module - this is an Apache2 licensed HTTP library written in
 # python for human beings; it is an improvement on the urllib2 module that makes
 # sending HTTP requests more efficient
@@ -23,6 +25,7 @@ import sys
 # is not limited to that problem domain"
 # (http://pymotw.com/2/json/)
 import json
+import math
 
 
 # Create function "fetch_results" that takes 4 arguments, all initialized to
@@ -30,7 +33,7 @@ import json
 def fetch_results(
     query=None, minAsk=None, maxAsk=None, bedrooms=None
 ):
-
+    startTime = datetime.now()
     # Define a dictionary named search_params that consolidates key-value-pairs 
     # in the local symbol table for which the value is not None
     search_params = {
@@ -47,14 +50,31 @@ def fetch_results(
     # Create a response object from the URL, passing arguments for the URL
     # (base), other possible string parameters, and a timeout parameter of 3
     # seconds
-    print(search_params)
     resp = requests.get(base, params=search_params, timeout=3)
     # Set function to raise exceptions for error codes when the request errors
     # out
     resp.raise_for_status()  # no op if status == 200
+    # Pull out result parameters to account for pagination
+    parsed = BeautifulSoup(resp.content, from_encoding='utf-8')
+    postings_string = parsed.find('span',class_='button pagenum').string
+    posting_count = int(postings_string.lstrip('1 - 100 of '))
+    postings_per_page = int(postings_string[4:postings_string.find(' of'):])
+    pages = int(math.ceil(posting_count/postings_per_page))
+    for i in range(pages - 1):
+        page = i+1
+        search_params['s'] = page*100
+        create_resp = 'resp_'+str(page)+' = requests.get(base, params=search_params, timeout=3)'
+        resp_raise = 'resp_'+str(page)+'.raise_for_status'
+        resp_bs_create = 'parsed_'+str(page)+' = BeautifulSoup(resp_'+str(page)+""".content, from_encoding='utf-8')"""
+        parse_push = 'parsed.body.append(parsed_'+str(page)+'.body)'
+        exec(create_resp)
+        exec(resp_raise)
+        exec(resp_bs_create)
+        exec(parse_push)
     # Function finally returns content of the response (in bytes) and the
     # encoding to decode when accessing the text in the response
-    return resp.content, resp.encoding
+    print('fetch_results run time: '+str(datetime.now()-startTime))
+    return parsed
 
 # html_base = fetch_results("South Lake Union", 1500, 2500)
 # with open('apartments.html', 'w') as outfile:
@@ -64,10 +84,12 @@ def fetch_results(
 # Define a function to return json structured results from pure json section of
 # the page - the function accepts an arbitrary of keyword arguments
 def fetch_json_results(**kwargs):
+    startTime = datetime.now()
     base = 'http://sfbay.craigslist.org/jsonsearch/sfc/apa'
     resp = requests.get(base, params=kwargs)
     resp.raise_for_status()
     # Returns the json-encoded content of the response, if any
+    print('fetch_json_results run time: '+str(datetime.now()-startTime))
     return resp.json()
 
 
@@ -75,21 +97,23 @@ def fetch_json_results(**kwargs):
 # ) where the file will be binarily (w/o truncation) read; the function returns
 # read file and encoding note
 def read_search_results(file='apartments.html'):
+    startTime = datetime.now()
     with open(file, 'rb') as read_file:
         return read_file.read(), 'utf-8'
+    print('read_search_results run time: '+str(datetime.now()-startTime))
 
 
 # Define parsing function, takes html as a required argument and encoding spec
 # as optional argument (defaulting to utf-8); parses html using BeautifulSoup
 # and returns that parse
-def parse_source(html, encoding='utf-8'):
-    parsed = BeautifulSoup(html, from_encoding=encoding)
-    return parsed
+#def parse_source(html, encoding='utf-8'):
+#    return parsed, pages
 
 
 # Define function that takes a parsed BeautifulSoup HTML object as only
 # (required) argument
 def extract_listings(parsed):
+    startTime = datetime.now()
     # Create an array containing all content inside <p> tags with CSS class
     # 'row'
     listings = parsed.find_all('p', class_='row')
@@ -128,6 +152,7 @@ def extract_listings(parsed):
             'size': price_span.next_sibling.strip(' \n-/')
         }
         yield this_listing
+    print('extract_listings run time: '+str(datetime.now()-startTime))
 
 
 # Define a function taking two arguments, "listing" and "search"; if value for
@@ -135,6 +160,7 @@ def extract_listings(parsed):
 # "location" into listing; the value will be a dictionary holding the latitude
 # and longitude of the location; otherwise return False
 def add_location(listing, search):
+    startTime = datetime.now()
     """True if listing can be located, otherwise False"""
     if listing['pid'] in search:
         match = search[listing['pid']]
@@ -144,10 +170,12 @@ def add_location(listing, search):
         }
         return True
     return False
+    print('add_location run time: '+str(datetime.now()-startTime))
 
 
 # Add address to listing dictionary
 def add_address(listing):
+    startTime = datetime.now()
     # Create URL string w/ url of google geocode maps api
     api_url = 'http://maps.googleapis.com/maps/api/geocode/json'
     # Pull 'location' value out of listing dictionary and store it in 'loc'
@@ -185,6 +213,7 @@ def add_address(listing):
         # 'unavailable' before returning the listing
         listing['address'] = 'unavailable'
     return listing
+    print('add_address run time: '+str(datetime.now()-startTime))
 
 
 # Run what comes next only if being run by the program itself, not if imported
@@ -206,11 +235,11 @@ if __name__ == '__main__':
     # If not, get results from the response object and pass through some
     # optional parameters for max and min ask and for # of bedrooms
     else:
-        html, encoding = fetch_results(
+        parsed_all = fetch_results(
             minAsk=500, maxAsk=5000, bedrooms=2
         )
     # Parse results w/ BeautifulSoup
-    doc = parse_source(html, encoding)
+    # doc = extract_listings(html, encoding)
     # Alternately fetch json results from alternative json craigslist site w/
     # keywords for minAsk, maxAsk and bedrooms - store these into 'json_res'
     # object
@@ -220,8 +249,8 @@ if __name__ == '__main__':
     # index json content to IDs
     search = {j['PostingID']: j for j in json_res[0]}
     # Listings are generated using extract_listings function; for each...
-    listings = extract_listings(doc)
-    with open('C:\\Users\\Lenddo\\Desktop\\test.csv','w',newline='', encoding='utf-8') as outfile:
+    listings = extract_listings(parsed_all)
+    with open('C:\\Users\\Lenddo\\Scraping-Projects\\Scraping-Projects\\test.csv','w',newline='', encoding='utf-8') as outfile:
         writer = csv.writer(outfile)
         writer.writerow(['address','description','link','data-latitude','data-longitude','pid','price','size'])
         for listing in listings:
@@ -230,7 +259,7 @@ if __name__ == '__main__':
             if (add_location(listing, search)):
                 listing = add_address(listing)
                 # ...and print the listing in a pretty way
-            pprint.pprint(listing)
+            #pprint.pprint(listing)
             csv_listing = []
             if 'address' in listing:
                 csv_listing.append(listing['address'])
@@ -247,8 +276,9 @@ if __name__ == '__main__':
             csv_listing.append(listing['pid'])
             csv_listing.append(listing['price'])
             csv_listing.append(listing['size'])
-            print(csv_listing)
+            #print(csv_listing)
             writer.writerow(csv_listing)
+    print('Overall run time: '+str(datetime.now()-overallStartTime))
                 
             
 
