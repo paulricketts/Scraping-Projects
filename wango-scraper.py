@@ -12,7 +12,7 @@ import csv
 import re
 import mechanize
 import string
-import editdist
+import nltk
 
 def fetch_raw_html(base_string,search_params={}):
     startTime = datetime.now()
@@ -194,12 +194,12 @@ def normalize_string(input_string):
         input_string = input_string.replace(p,'')
     for prep in preps:
         input_string = input_string.replace(prep,' ')
-    print("""'input_string' executed.  Run time: """+str(datetime.now()-startTime))
+    print("""'normalize_string' executed.  Run time: """+str(datetime.now()-startTime))
     return input_string
 
 def generate_output():
     startTime = datetime.now()
-    top_string = """C:\\Users\\Lenddo\\Scraping-Projects\\Scraping-Projects\\wango-scraped-html\\"""
+    top_string = """C:\\Users\\Paul\\Scraping-Projects\\wango-scraped-html\\"""
     top_dir = os.listdir(top_string)
     output = [['id','name','street_address','city','country','region','interest_area']]
     ids = []
@@ -233,11 +233,11 @@ def generate_output():
                         interestArea.replace("\\","\\\\").encode('utf-8')
                     ])
                 except TypeError:
-                    print regionName
-                    print interestArea
-                    print org
-                    print locales
-                    print """There was an error.  'generate_output' ran for """+str(datetime.now()-startTime)+""" s."""
+                    print(regionName)
+                    print(interestArea)
+                    print(org)
+                    print(locales)
+                    print("""There was an error.  'generate_output' ran for """+str(datetime.now()-startTime)+""" s.""")
                     break
     print("""'generate_output' executed.  Run time: """+str(datetime.now()-startTime))
     return output, interest_areas
@@ -246,25 +246,26 @@ def pull_place_ids(output):
     potential_matches = [['org_id','org_name','org_name_normalized','match_name','match_name_normalized','place_id','edit_distance']]
     for i in range(1,len(output)-1):
         query_string = (normalize_string(output[i][1])+' near '+normalize_string(output[i][3])+' '+normalize_string(output[i][4])).replace(' ','+')
+        print("""map_hits = requests.get('https://maps.googleapis.com/maps/api/place/textsearch/json?query='"""+query_string+"""'&key=AIzaSyAuoBD1ABjNi3wwXSxQ-FdeJChk1UYqHSM')""")
         map_hits = requests.get('https://maps.googleapis.com/maps/api/place/textsearch/json?query='+query_string+'&key=AIzaSyAuoBD1ABjNi3wwXSxQ-FdeJChk1UYqHSM')
         data = json.loads(map_hits.text)
-        if data.results != []:
-            for item in data.results:
+        if 'results' in data.keys():
+            for item in data['results']:
                 potential_matches.append([
                     output[i][0],
                     output[i][1],
                     normalize_string(output[i][0]),
-                    item.name,
-                    normalize_string(item_name),
-                    item.place_id,
-                    editdist.distance(normalize_string(output[i][0]),normalize_string(item_name))
+                    item['name'],
+                    normalize_string(item['name']),
+                    item['place_id'],
+                    nltk.edit_distance(normalize_string(output[i][0]),normalize_string(item['name']))
                 ])
-                print potential_matches[i]
+                print(potential_matches[i])
         
 
 def write_output(output,interest_areas):
     startTime = datetime.now()
-    with open("""C:\\Users\\Lenddo\\Scraping-Projects\\Scraping-Projects\\wango_outputs\\wango_output.csv""",'w') as outfile:
+    with open("""C:\\Users\\Paul\\Scraping-Projects\\wango_outputs\\wango_output.csv""",'w') as outfile:
         writer = csv.writer(outfile,lineterminator='\n')
         for item in output:
             writer.writerow(item)
@@ -277,4 +278,5 @@ if __name__ == '__main__':
     #top_soup = parse_html(top_html,top_encoding)
     #region_dict = generate_region_dict(top_soup)
     #area_dict = create_area_dict(region_dict)
-    pull_place_ids(generate_output()[0])
+    output, interest_areas = generate_output()
+    pull_place_ids(output)
